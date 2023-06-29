@@ -1,0 +1,397 @@
+blueprint:
+  name: Light
+  description: Controls a light, optionally using sensors
+  domain: automation
+  input:
+    occupancy_mode:
+      name: Use a sensor
+      description: If enabled, a sensor will be used to control the lights
+      default: false
+      selector:
+        boolean: {}
+    only_off_mode:
+      name: Do not turn on the light
+      description: If enabled, the sensor will only be used to turn off the light, not turn it on
+      default: false
+      selector:
+        boolean: {}
+    occupancy_sensor_entity:
+      name: Sensor
+      description: Sensor that triggers the light
+      default: {}
+      selector:
+        entity:
+          domain:
+            - binary_sensor
+            - group
+    light_entity:
+      name: Light
+      description: The light to control
+      selector:
+        entity: 
+          domain: 
+            - light
+            - switch
+          multiple: true
+    guest_mode:
+      name: Trigger while in guest mode
+      description: If enabled, the automation can be triggered when guest mode is on
+      selector:
+        boolean: {}
+      default: false
+    home_occupancy:
+      name: Trigger while home is not occupied
+      description: If enabled, the sensor automation can be triggered when the home is not occupied
+      selector:
+        boolean: {}
+      default: false
+    quiet_mode:
+      name: Trigger while in quiet mode
+      description: If enabled, the sensor automation can be triggered when quiet mode is on
+      selector:
+        boolean: {}
+      default: false
+    turn_off_delay:
+      name: Delay time
+      description: Amount of time to leave the light on after the triggering sensor turns off
+      selector:
+        duration: {}
+      default:
+        minutes: 10
+    turn_on_brightness:
+      name: Brightness
+      description: The brightness of the light when turned on
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+          unit_of_measurement: "%"
+      default: 100
+    turn_on_transition:
+      name: On transition
+      description: Transition time for the light to turn on
+      selector:
+        number:
+          min: 0
+          max: 30
+          mode: slider
+          unit_of_measurement: seconds
+      default: 0
+    ambient_light_mode:
+      name: Use ambient light
+      description: If enabled, an ambient light sensor will be used to determine if the lights should turn on
+      default: false
+      selector:
+        boolean: {}
+    ambient_light_limit:
+      name: Ambient light limit
+      description: The light will not turn on if the local ambient light is above the limit
+      selector:
+        number:
+          min: 50
+          max: 1000
+          mode: slider
+          unit_of_measurement: lux
+      default: 150
+    ambient_light_sensor:
+      name: Ambient light sensor
+      description: The sensor to use for the local ambient light
+      default:
+      selector:
+        entity:
+          domain:
+            - sensor
+            - group
+          device_class: illuminance
+    moonlight_mode:
+      name: Moonlight
+      description: The light will moonlight
+      selector:
+        boolean: {}
+      default: false
+    moonlight_brightness:
+      name: Moonlight brightness
+      description: Light brightness during moonlighting
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+          unit_of_measurement: "%"
+      default: 5
+    nightlight_mode:
+      name: Night light
+      description: The light will turn on in quiet mode
+      selector:
+        boolean: {}
+      default: false
+    nightlight_brightness:
+      name: Night light brightness
+      description: Light brightness during night light mode
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider
+          unit_of_measurement: "%"
+      default: 5
+    arrival_mode:
+      name: Arrival light
+      description: The light will turn on when someone arrives at night
+      selector:
+        boolean: {}
+      default: false
+    home_mode:
+      name: Occupancy light
+      description: The light will turn on when someone arrives to an unoccupied house at night
+      selector:
+        boolean: {}
+      default: false
+    maximum_run_time:
+      name: Maximum run time
+      description: Maximum amount of time before the switch is turned off
+      selector:
+        duration: {}
+      default:
+        hours: 8
+
+variables:
+  ambient_light_limit: !input ambient_light_limit
+  ambient_light_mode: !input ambient_light_mode
+  ambient_light_sensor: !input ambient_light_sensor
+  guest_mode: !input guest_mode
+  home_occupancy: !input home_occupancy
+  light_entity: !input light_entity
+  moonlight_brightness: !input moonlight_brightness
+  moonlight_mode: !input moonlight_mode
+  nightlight_mode: !input nightlight_mode
+  occupancy_mode: !input occupancy_mode
+  only_off_mode: !input only_off_mode
+
+mode: restart
+max_exceeded: silent
+
+trigger_variables:
+  t_occupancy_mode: !input occupancy_mode
+  t_occupancy_sensor_entity: !input occupancy_sensor_entity
+
+trigger:
+  - platform: template
+    value_template: "{{ t_occupancy_mode == true and (states(t_occupancy_sensor_entity) == 'on') }}"
+    id: 'occupancy_starts'
+
+  - platform: state
+    entity_id: input_select.home_lighting_mode
+    from: 'normal'
+    to: 'moonlight'
+    id: 'moonlight_on'
+
+  - platform: state
+    entity_id: input_select.home_lighting_mode
+    from: 'moonlight'
+    to: 'normal'
+    id: 'moonlight_off'
+
+  - platform: state
+    entity_id: input_select.home_lighting_mode
+    not_from: 'quiet'
+    to: 'quiet'
+    id: 'quietmode_on'
+
+  - platform: state
+    entity_id: input_select.home_lighting_mode
+    from: 'quiet'
+    not_to: 'quiet'
+    id: 'quietmode_off'
+
+condition:
+    # guest mode constraint
+  - condition: or
+    conditions:
+      - "{{ states('input_boolean.guest_mode') == 'off' }}"
+      - "{{ guest_mode == 'on' }}"
+
+action:    
+  - choose:
+    # Moonlight mode has turned on
+    - conditions:
+      - condition: trigger
+        id: 'moonlight_on'
+      - condition: state
+        entity_id: !input light_entity
+        state: 'off'
+      - "{{ moonlight_mode == true }}"
+      sequence:
+        - service: light.turn_on
+          data:
+            brightness_pct: "{{ moonlight_brightness }}"
+            transition: 10
+          target:
+            entity_id: !input light_entity
+    
+    # Moonlight mode has turned off
+    - conditions:
+      - condition: trigger
+        id: 'moonlight_off'
+      - condition: state
+        entity_id: !input light_entity
+        state: 'on'
+      - condition: and
+        conditions:
+          - "{{ occupancy_mode == true }}"
+          - condition: state
+            entity_id: !input occupancy_sensor_entity
+            state: 'off'
+      - "{{ moonlight_mode == true }}"
+      sequence:
+        - service: homeassistant.turn_off
+          data: {}
+          target:
+            entity_id: !input light_entity
+    
+    # Quiet mode has turned on
+    - conditions:
+      - condition: trigger
+        id: 'quietmode_on'      
+      sequence:
+        - if:
+          - condition: template
+            value_template: "{{ nightlight_mode == false }}"
+          then:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'switch.' in light_entity[0] }}"
+                  sequence:
+                    - service: switch.turn_off
+                      data: {}
+                      target:
+                        entity_id: !input light_entity
+              default:
+                - service: light.turn_off
+                  data:
+                    transition: 10
+                  target:
+                    entity_id: !input light_entity
+          else:
+            - service: light.turn_on
+              data:
+                brightness_pct: !input nightlight_brightness
+                transition: 10
+              target:
+                entity_id: !input light_entity
+
+    # Quiet mode has turned off
+    - conditions:
+      - condition: trigger
+        id: 'quietmode_off'
+      - "{{ nightlight_mode == true }}"
+      sequence:
+        - if:
+          - condition: state
+            entity_id: !input occupancy_sensor_entity
+            state: 'on'
+          then:
+            - service: light.turn_on
+              data:
+                brightness_pct: 100
+                transition: 10
+              target:
+                entity_id: !input light_entity
+          else:
+            - service: light.turn_off
+              data:
+                transition: 10
+              target:
+                entity_id: !input light_entity
+
+    # Turn on lights based on occupancy
+    - conditions:
+      - condition: trigger
+        id: 'occupancy_starts'
+      # home occupancy constraint
+      - condition: or
+        conditions:
+          - condition: state
+            entity_id: input_boolean.home_occupancy
+            state: 'on'
+          - "{{ home_occupancy == 'on'}}"
+      # quiet mode constraint
+      - condition: or
+        conditions:
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: input_select.home_lighting_mode
+                state: 'quiet'
+          - "{{ quiet_mode == 'on' }}"
+
+      sequence:
+        - if:
+            - "{{ only_off_mode == false }}"
+            - condition: or
+              conditions:
+                - "{{ ambient_light_mode == false }}"
+                - condition: and
+                  conditions: 
+                    - "{{ ambient_light_mode == true }}"
+                    - "{{ (states(ambient_light_sensor) | int) < (ambient_light_limit | int) }}"
+          then:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ 'switch.' in light_entity[0] }}"
+                  sequence:
+                    - service: switch.turn_on
+                      data: {}
+                      target:
+                        entity_id: !input light_entity
+              default:
+                - service: light.turn_on
+                  data:
+                    brightness_pct: !input turn_on_brightness
+                    transition: !input turn_on_transition
+                  target:
+                    entity_id: !input light_entity
+
+        # wait for the sensor to turn off for the delay period
+        - wait_for_trigger:
+          - platform: state
+            entity_id: !input occupancy_sensor_entity
+            to: 'off'
+            for: !input turn_off_delay
+          timeout: !input maximum_run_time
+
+        # Turn off light. Different commands for lights/switches
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ 'switch.' in light_entity[0] }}"
+              sequence:
+                - service: switch.turn_off
+                  data: {}
+                  target:
+                    entity_id: !input light_entity
+          default:
+            - if:
+              - condition: and
+                conditions:
+                  - condition: state
+                    entity_id: input_select.home_lighting_mode
+                    state: 'moonlight'
+                  - "{{ moonlight_mode == true }}"
+              then:
+                - service: light.turn_on
+                  data:
+                    brightness_pct: !input moonlight_brightness
+                    transition: 10
+                  target:
+                    entity_id: !input light_entity
+              else:
+                - service: light.turn_off
+                  data: {}
+                  entity_id: !input light_entity
