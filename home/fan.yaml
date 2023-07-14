@@ -116,8 +116,8 @@ trigger:
     id: 'home_occupancy_change'
 
   - platform: state
-    entity_id: input_boolean.quiet_mode
-    id: 'quiet_mode_change'
+    entity_id: input_select.home_lighting_mode
+    id: 'lighting_mode_change'
 
 condition:
     # guest mode constraint
@@ -147,10 +147,10 @@ action:
       # Quiet mode has turned on
       - conditions:
         - condition: trigger
-          id: 'quiet_mode_change'
+          id: 'lighting_mode_change'
         - condition: state
-          entity_id: input_boolean.quiet_mode
-          state: 'on'
+          entity_id: input_select.home_lighting_mode
+          state: 'quiet'
         - "{{ quiet_mode == false }}"
 
         sequence:
@@ -182,9 +182,11 @@ action:
       # quiet mode constraint
       - condition: or
         conditions:
-          - condition: state
-            entity_id: input_boolean.quiet_mode
-            state: 'off'
+          - condition: not
+            conditions:
+              - condition: state
+                entity_id: input_select.home_lighting_mode
+                state: 'quiet'
           - "{{ quiet_mode == true }}"    
           
       - choose:
