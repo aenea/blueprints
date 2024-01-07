@@ -14,26 +14,28 @@ blueprint:
             - light
             - switch
           multiple: true
-    start_elevation:
-      name: Turn on elevation
-      description: The device turns on when the sun drops to this elevation
+    start_offset:
+      name: Turn on time
+      description: The device turns on at sunset +- the offset
       selector:
         number:
           min: -90
           max: 90
-          unit_of_measurement: degrees
-          step: 1
-          mode: slider 
-    stop_elevation:
-      name: Turn off elevation
-      description: The device turns off when the sun climbs to this elevation
-      selector:
-        number:
-          min: -90
-          max: 90
-          unit_of_measurement: degrees
+          unit_of_measurement: min
           step: 1
           mode: slider
+      default: 0 
+    stop_offset:
+      name: Turn off time
+      description: The device turns off at sunrise +- the offset
+      selector:
+        number:
+          min: -90
+          max: 90
+          unit_of_measurement: min
+          step: 1
+          mode: slider
+      default: 0
     rain_blocker:
       name: Turn off while raining
       description: Turn off the device while it is raining
@@ -54,21 +56,27 @@ blueprint:
 variables:
   rain_blocker: !input rain_blocker
   target_device: !input "target_device"
-  start_elevation: !input "start_elevation"
-  stop_elevation: !input "stop_elevation"
+  start_offset: !input "start_offset"
+  stop_offset: !input "stop_offset"
   minimum_temperature: !input "minimum_temperature"
+
+trigger_variables:
+  t_start_offset: !input "start_offset"
+  t_start_offset_seconds: "{{ (t_start_offset * 60) | int }}"
+  t_stop_offset: !input "stop_offset"
+  t_stop_offset_seconds: "{{ (t_stop_offset * 60) | int }}"
 
 trigger:
     # the sun has dropped to the starting elevation
   - platform: numeric_state
     entity_id: sun.sun
     attribute: elevation
-    below: !input "start_elevation"
+    below: !input "start_offset"
     # the sun has risen to the stopping elevation
   - platform: numeric_state
     entity_id: sun.sun
     attribute: elevation
-    above: !input "stop_elevation"
+    above: !input "stop_offset"
     # rain has started
   - platform: numeric_state
     entity_id: sensor.weewx_rainrate_in_per_hour
@@ -120,7 +128,7 @@ action:
       - condition: numeric_state
         entity_id: sun.sun
         attribute: elevation
-        above: !input "stop_elevation"
+        above: !input "stop_offset"
       - condition: state
         entity_id: sun.sun
         attribute: rising
@@ -135,7 +143,7 @@ action:
       - condition: numeric_state
         entity_id: sun.sun
         attribute: elevation
-        below: !input "start_elevation"
+        below: !input "start_offset"
       - condition: numeric_state
         entity_id: sensor.weewx_outtemp_f
         above: !input "minimum_temperature"

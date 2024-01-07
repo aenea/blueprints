@@ -319,7 +319,7 @@ action:
           - condition: state
             entity_id: input_boolean.home_occupancy
             state: 'on'
-          - "{{ home_occupancy == 'on'}}"
+          - "{{ home_occupancy == true }}"
       # quiet mode constraint
       - condition: or
         conditions:
@@ -328,7 +328,7 @@ action:
               - condition: state
                 entity_id: input_select.home_lighting_mode
                 state: 'quiet'
-          - "{{ quiet_mode == 'on' }}"
+          - "{{ quiet_mode == true }}"
 
       sequence:
         - if:
