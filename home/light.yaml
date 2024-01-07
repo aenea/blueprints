@@ -33,6 +33,21 @@ blueprint:
             - light
             - switch
           multiple: true
+    arrival_light:
+      name: Turn on when someone arrives
+      description: If enabled, the light will turn on when someone arrives at night
+      selector:
+        boolean: {}
+      default: false
+    arrival_entity:
+      name: Arrival people
+      description: People that will trigger the arrival light
+      selector:
+        entity:
+          domain:
+            - person
+          multiple: true 
+      default: {}           
     guest_mode:
       name: Trigger while in guest mode
       description: If enabled, the automation can be triggered when guest mode is on
@@ -122,6 +137,11 @@ blueprint:
           mode: slider
           unit_of_measurement: "%"
       default: 5
+    moonlight_color:
+      name: Use color for moonlight
+      selector:
+        boolean: {}
+      default: false
     nightlight_mode:
       name: Night light
       description: The light will turn on in quiet mode
@@ -167,6 +187,7 @@ variables:
   home_occupancy: !input home_occupancy
   light_entity: !input light_entity
   moonlight_brightness: !input moonlight_brightness
+  moonlight_color: !input moonlight_color
   moonlight_mode: !input moonlight_mode
   nightlight_mode: !input nightlight_mode
   occupancy_mode: !input occupancy_mode
@@ -176,10 +197,16 @@ mode: restart
 max_exceeded: silent
 
 trigger_variables:
+#  t_arrival_light: !input arrival_light
+#  t_arrival_entity: !input arrival_entity
   t_occupancy_mode: !input occupancy_mode
   t_occupancy_sensor_entity: !input occupancy_sensor_entity
 
 trigger:
+#  - platform: template
+#    value_template: "{{ t_arrival_light == true and (states(t_arrival_entity) == 'home') }}"
+#    id: 'arrival_starts'
+
   - platform: template
     value_template: "{{ t_occupancy_mode == true and (states(t_occupancy_sensor_entity) == 'on') }}"
     id: 'occupancy_starts'
@@ -226,12 +253,26 @@ action:
         state: 'off'
       - "{{ moonlight_mode == true }}"
       sequence:
-        - service: light.turn_on
-          data:
-            brightness_pct: "{{ moonlight_brightness }}"
-            transition: 10
-          target:
-            entity_id: !input light_entity
+        - if:
+          - condition: template
+            value_template: "{{ moonlight_color == true }}"
+          then:
+            - service: light.turn_on
+              data:
+                brightness_pct: "{{ moonlight_brightness }}"
+                hs_color:
+                  - "{{ range(360)|random }}"
+                  - "{{ range(80,101)|random }}"
+                transition: 10
+              target:
+                entity_id: !input light_entity
+          else:
+            - service: light.turn_on
+              data:
+                brightness_pct: "{{ moonlight_brightness }}"
+                transition: 10
+              target:
+                entity_id: !input light_entity
     
     # Moonlight mode has turned off
     - conditions:
@@ -240,12 +281,15 @@ action:
       - condition: state
         entity_id: !input light_entity
         state: 'on'
-      - condition: and
+      - condition: or
         conditions:
-          - "{{ occupancy_mode == true }}"
-          - condition: state
-            entity_id: !input occupancy_sensor_entity
-            state: 'off'
+          - "{{ occupancy_mode == false }}"
+          - condition: and
+            conditions:
+              - "{{ occupancy_mode == true }}"
+              - condition: state
+                entity_id: !input occupancy_sensor_entity
+                state: 'off'
       - "{{ moonlight_mode == true }}"
       sequence:
         - service: homeassistant.turn_off
@@ -319,7 +363,7 @@ action:
           - condition: state
             entity_id: input_boolean.home_occupancy
             state: 'on'
-          - "{{ home_occupancy == true }}"
+          - "{{ home_occupancy == 'on'}}"
       # quiet mode constraint
       - condition: or
         conditions:
@@ -385,12 +429,26 @@ action:
                     state: 'moonlight'
                   - "{{ moonlight_mode == true }}"
               then:
-                - service: light.turn_on
-                  data:
-                    brightness_pct: !input moonlight_brightness
-                    transition: 10
-                  target:
-                    entity_id: !input light_entity
+              - if:
+                - condition: template
+                  value_template: "{{ moonlight_color == true }}"
+                then:
+                  - service: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      hs_color:
+                        - "{{ range(360)|random }}"
+                        - "{{ range(80,101)|random }}"
+                      transition: 10
+                    target:
+                      entity_id: !input light_entity
+                else:
+                  - service: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      transition: 10
+                    target:
+                      entity_id: !input light_entity
               else:
                 - service: light.turn_off
                   data: {}
