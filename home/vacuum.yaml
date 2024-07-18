@@ -80,10 +80,10 @@ condition:
     conditions:
       - condition: trigger
         id: 'someone_arrives'
-      - "{{ run_once == 'off' }}"
+      - "{{ run_once == 'false' }}"
       - condition: and
         conditions:
-          - "{{ run_once == 'on' }}"
+          - "{{ run_once == 'true' }}"
           - "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < today_at('06:00') }}"
 
 action:
