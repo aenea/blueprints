@@ -32,6 +32,15 @@ blueprint:
       selector:
         boolean: {}
       default: true
+    run_periodically:
+      name: Run periodically
+      description: Run the vacuum if it hasn't been run in x days. Set to 0 to disable
+      selector:
+        number:
+          min: 0
+          max: 14
+          step: 1          
+      default: 3
     guest_mode:
       name: Trigger while in guest mode
       description: If enabled, the automation can be triggered when guest mode is on
@@ -42,6 +51,7 @@ blueprint:
 variables:
   guest_mode: !input guest_mode
   run_once: !input run_once
+  periodic_schedule: !input periodic_schedule
 
 mode: restart
 max_exceeded: silent
@@ -57,6 +67,12 @@ trigger:
     from: 'home'
     to: 'not_home'
     id: 'someone_leaves'
+
+  - platform: state
+    entity_id: schedule.periodic_vacuum_check
+    from: 'off'
+    to: 'on'
+    id: 'periodic_schedule'
 
 condition:
   # guest mode constraint
@@ -81,9 +97,10 @@ condition:
 action:
   - choose:
     # Someone arrives
-    - conditions:
-      - condition: trigger
-        id: 'someone_arrives'
+    - condition: or
+      conditions:
+        - condition: trigger
+          id: 'someone_arrives'
       
       sequence:
         - if:
@@ -113,5 +130,15 @@ action:
             - service: vacuum.start
               target: 
                 entity_id: !input vacuum_entity
+
+    # Periodic check
+    - conditions:
+      - condition: trigger
+        id: 'periodic_schedule'
+
+      sequence:
+        - if:
+            - {{ periodic_check > 0 }}
+
 
 
