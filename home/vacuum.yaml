@@ -18,7 +18,7 @@ blueprint:
           domain:
             - person
           multiple: true
-      default: {}
+      default: []
     everyone_must_leave:
       name: Everyone must leave
       description: Start only if everyone has left
@@ -33,7 +33,7 @@ blueprint:
           domain:
             - person
           multiple: true
-      default: {}
+      default: []
     run_once:
       name: Run once per day
       description: Don't run the automation more than once per day
