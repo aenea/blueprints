@@ -18,13 +18,6 @@ blueprint:
           domain:
             - person
           multiple: true
-      default: []
-    everyone_must_leave:
-      name: Everyone must leave
-      description: Start only if everyone has left
-      selector:
-        boolean: {}
-      default: false
     arrival_entities:
       name: Stop people
       description: Stop when these people arrive
@@ -33,7 +26,6 @@ blueprint:
           domain:
             - person
           multiple: true
-      default: []
     run_once:
       name: Run once per day
       description: Don't run the automation more than once per day
