@@ -73,7 +73,7 @@ condition:
       - condition: state
         entity_id: input_boolean.guest_mode
         state: 'off'
-      - "{{ guest_mode == 'on' }}"
+      - "{{ guest_mode == true }}"
 
   # run once constraint
   - condition: or
