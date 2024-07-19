@@ -125,7 +125,7 @@ action:
             - condition: trigger
               id: 'periodic_schedule'
             - {{ run_periodically > 0 }}
-            - {{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-run_periodically)) }}
+            - {{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-3)) }}
 
       sequence:
         - if:
