@@ -51,7 +51,7 @@ blueprint:
 variables:
   guest_mode: !input guest_mode
   run_once: !input run_once
-  periodic_schedule: !input periodic_schedule
+  run_periodically: !input run_periodically
 
 mode: restart
 max_exceeded: silent
@@ -97,8 +97,7 @@ condition:
 action:
   - choose:
     # Someone arrives
-    - condition: or
-      conditions:
+    - conditions:
         - condition: trigger
           id: 'someone_arrives'
       
@@ -116,10 +115,17 @@ action:
               target:
                 entity_id: !input vacuum_entity
 
-    # Someone leaves
-    - conditions:
-      - condition: trigger
-        id: 'someone_leaves'
+    # Start the vacuum
+    - condition: or
+      conditions:
+        - condition: trigger
+          id: 'someone_leaves'
+        - condition: and
+          conditions:
+            - condition: trigger
+              id: 'periodic_schedule'
+            - {{ run_periodically > 0 }}
+            - {{ state_attr(this.entity_id, 'last_triggered').replace(hour=0, minute=0, second=0, microsecond=0) | default(today_at(), true) <= (now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=-run_periodically) }}
 
       sequence:
         - if:
@@ -130,15 +136,3 @@ action:
             - service: vacuum.start
               target: 
                 entity_id: !input vacuum_entity
-
-    # Periodic check
-    - conditions:
-      - condition: trigger
-        id: 'periodic_schedule'
-
-      sequence:
-        - if:
-            - {{ periodic_check > 0 }}
-
-
-
