@@ -127,16 +127,19 @@ action:
                 entity_id: !input vacuum_entity
 
     # Start the vacuum
-    - condition: or
-      conditions:
-        - condition: trigger
-          id: 'someone_leaves'
-        - condition: and
+    - conditions:
+        - condition: or
           conditions:
             - condition: trigger
-              id: 'periodic_schedule'
-            - "{{ run_periodically > 0 }}"
-            - "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-3)) }}"
+              id: 'someone_leaves'
+            - condition: and
+              conditions:
+                - condition: trigger
+                  id: 'periodic_schedule'
+                - condition: template
+                  value_template: "{{ run_periodically > 0 }}"
+                - condition: template
+                  value_template: "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-3)) }}"
 
       sequence:
         - if:
