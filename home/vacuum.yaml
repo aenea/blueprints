@@ -32,6 +32,12 @@ blueprint:
       selector:
         boolean: {}
       default: true
+    before_time:
+      name: Do not run before
+      description: Disallow automation if triggered before this time (HH:MM, 24-hour format)
+      selector:
+        time: {}
+      default: "00:00"
     run_periodically:
       name: Run periodically
       description: Run the vacuum if it hasn't been run in x days. Set to 0 to disable
@@ -52,6 +58,7 @@ variables:
   guest_mode: !input guest_mode
   run_once: !input run_once
   run_periodically: !input run_periodically
+  before_time: !input before_time
 
 mode: restart
 max_exceeded: silent
@@ -93,6 +100,10 @@ condition:
         conditions:
           - "{{ run_once == true }}"
           - "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < today_at('06:00') }}"
+ 
+  # Disable before a certain time
+  - condition: template
+    value_template: "{{ now().strftime('%H:%M') >= before_time }}"
 
 action:
   - choose:
