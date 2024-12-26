@@ -151,6 +151,7 @@ blueprint:
     ambient_light_sensor:
       name: Ambient light sensor
       description: The sensor to use for the local ambient light
+      default: {}
       selector:
         entity:
           domain:
