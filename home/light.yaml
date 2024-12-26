@@ -23,7 +23,7 @@
 # - maximum_run_time: Maximum amount of time before the switch is turned off.
 
 blueprint:
-  name: Light
+  name: ArrilvalLight
   description: Controls lights based on occupancy and arrival
   domain: automation
   input:
@@ -201,14 +201,7 @@ blueprint:
           mode: slider
           unit_of_measurement: "%"
       default: 5
-    # Option to turn on the light when someone arrives at night
-    arrival_mode:
-      name: Arrival light
-      description: The light will turn on when someone arrives at night
-      selector:
-        boolean: {}
-      default: false
-    # Option to turn on the light when someone arrives to an unoccupied house at night
+     # Option to turn on the light when someone arrives to an unoccupied house at night
     home_mode:
       name: Occupancy light
       description: The light will turn on when someone arrives to an unoccupied house at night
@@ -226,7 +219,7 @@ blueprint:
     # Doors that will turn off the light when opened
     door_entities:
       name: Doors
-      description: Doors that will turn off the light when opened
+      description: Doors that will turn off the arrival light when opened
       selector:
         entity:
           domain:
