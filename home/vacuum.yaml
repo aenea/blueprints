@@ -1,3 +1,17 @@
+# Summary:
+# This blueprint defines an automation for controlling a vacuum based on occupancy. 
+# It includes the following inputs:
+# - vacuum_entity: The vacuum to control.
+# - leave_entities: People whose departure will start the vacuum.
+# - arrival_entities: People whose arrival will stop the vacuum.
+# - run_once: Option to run the automation only once per day.
+# - before_time: Time before which the vacuum should not run.
+# - run_periodically: Option to run the vacuum periodically if it hasn't been run in a specified number of days.
+# - guest_mode: Option to allow the automation to trigger when guest mode is on.
+#
+# The automation triggers when people leave or arrive, and it includes conditions to respect guest mode, 
+# run once per day, and not run before a specified time.
+
 blueprint:
   name: Vacuum
   description: Controls a vacuum based on occupancy
@@ -11,16 +25,16 @@ blueprint:
           domain: 
             - vacuum
     leave_entities:
-      name: Start people
-      description: Start when these people leave
+      name: Start when people leave
+      description: Start the vacuum when these people leave
       selector:
         entity:
           domain:
             - person
           multiple: true
     arrival_entities:
-      name: Stop people
-      description: Stop when these people arrive
+      name: Stop when people arrive
+      description: Stop the vacuum when these people arrive
       selector:
         entity:
           domain:
@@ -34,10 +48,10 @@ blueprint:
       default: true
     before_time:
       name: Do not run before
-      description: Disallow automation if triggered before this time (HH:MM, 24-hour format)
+      description: Do not run the vacuum before this time
       selector:
         time: {}
-      default: "00:00"
+      default: '08:00:00'
     run_periodically:
       name: Run periodically
       description: Run the vacuum if it hasn't been run in x days. Set to 0 to disable
@@ -93,14 +107,17 @@ condition:
   # run once constraint
   - condition: or
     conditions:
-      - condition: trigger
-        id: 'someone_arrives'
-      - "{{ run_once == false }}"
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: 'someone_arrives'
+          - "{{ run_once == false }}"
+
       - condition: and
         conditions:
           - "{{ run_once == true }}"
           - "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < today_at('06:00') }}"
- 
+
   # Disable before a certain time
   - condition: template
     value_template: "{{ now().strftime('%H:%M') >= before_time }}"
