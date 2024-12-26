@@ -45,6 +45,7 @@ blueprint:
     occupancy_sensor_entity:
       name: Sensor
       description: Sensor that triggers the light
+      default: {}s
       selector:
         entity:
           domain:
