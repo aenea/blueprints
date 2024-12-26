@@ -293,10 +293,10 @@ trigger:
     id: 'arrival'
 
   # Trigger when doors are opened
-  - platform: state
-    entity_id: !input door_entities
-    to: 'on'
-    id: 'door_opened'
+#  - platform: state
+#    entity_id: !input door_entities
+#    to: 'on'
+#    id: 'door_opened'
 
 condition:
   # Guest mode constraint
