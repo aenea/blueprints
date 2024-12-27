@@ -238,9 +238,8 @@ blueprint:
       default: []
       selector:
         entity:
-          device_class: 
-            - door
-            - opening
+          domain:
+            - binary_sensor
           multiple: true
 
 variables:
