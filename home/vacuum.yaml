@@ -105,18 +105,14 @@ condition:
       - "{{ guest_mode == true }}"
 
   # run once constraint
-  - condition: or
-    conditions:
-      - condition: and
-        conditions:
-          - condition: trigger
-            id: 'someone_arrives'
-          - "{{ run_once == false }}"
-
-      - condition: and
-        conditions:
-          - "{{ run_once == true }}"
-          - "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < today_at('06:00') }}"
+  - condition: and
+      conditions:
+        - condition: template
+          value_template: "{{ run_once == true }}"
+        - condition: template
+          value_template: >
+            {{ not is_state_attr(vacuum_entity, 'status', 'cleaning') or 
+            (state_attr(vacuum_entity, 'last_changed') | as_datetime).date() != now().date() }}
 
   # Disable before a certain time
   - condition: template
