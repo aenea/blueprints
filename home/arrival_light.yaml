@@ -533,9 +533,9 @@ action:
 
         # Wait for doors to open or 45 minutes to elapse
         - wait_for_trigger:
-          - platform: state
-            entity_id: !input door_entities
-            to: 'on'
+            - platform: state
+              entity_id: !input door_entities
+              to: 'on'
           timeout: !input arrival_run_time
 
         # Turn off light
