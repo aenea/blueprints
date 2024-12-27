@@ -234,6 +234,7 @@ blueprint:
     door_entities:
       name: Doors
       description: Doors that will turn off the arrival light when opened
+      default: {}
       selector:
         entity:
           domain:
