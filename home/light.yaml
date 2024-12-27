@@ -18,12 +18,16 @@
 # - moonlight_color: Option to use color for moonlight.
 # - nightlight_mode: Option to enable night light mode.
 # - nightlight_brightness: Light brightness during night light mode.
-# - arrival_mode: Option to turn on the light when someone arrives at night.
 # - home_mode: Option to turn on the light when someone arrives to an unoccupied house at night.
 # - maximum_run_time: Maximum amount of time before the switch is turned off.
+# - arrival_light: Option to turn on the light when someone arrives at night.
+# - arrival_entity: People that will trigger the arrival light.
+# - arrival_run_time: Amount of time to wait before turning off the arrival light.
+# - door_entities: Doors that will turn off the arrival light when opened.
+
 
 blueprint:
-  name: ArrilvalLight
+  name: light
   description: Controls lights based on occupancy and arrival
   domain: automation
   input:
@@ -61,23 +65,6 @@ blueprint:
             - light
             - switch
           multiple: true
-    # Option to turn on the light when someone arrives at night
-    arrival_light:
-      name: Turn on when someone arrives
-      description: If enabled, the light will turn on when someone arrives at night
-      selector:
-        boolean: {}
-      default: false
-    # People that will trigger the arrival light
-    arrival_entity:
-      name: Arrival people
-      description: People that will trigger the arrival light
-      selector:
-        entity:
-          domain:
-            - person
-          multiple: true 
-      default: []
     # Option to allow the automation to trigger when guest mode is on
     guest_mode:
       name: Trigger while in guest mode
@@ -218,6 +205,23 @@ blueprint:
         duration: {}
       default:
         hours: 8
+    # Option to turn on the light when someone arrives at night
+    arrival_light:
+      name: Turn on when someone arrives
+      description: If enabled, the light will turn on when someone arrives at night
+      selector:
+        boolean: {}
+      default: false
+    # People that will trigger the arrival light
+    arrival_entity:
+      name: Arrival people
+      description: People that will trigger the arrival light
+      selector:
+        entity:
+          domain:
+            - person
+          multiple: true 
+      default: []
     # Amount of time to wait before turning off the arrival light
     arrival_run_time:
       name: Arrival run time
