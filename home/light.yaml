@@ -216,6 +216,7 @@ blueprint:
     arrival_entity:
       name: Arrival people
       description: People that will trigger the arrival light
+      default: []
       selector:
         entity:
           domain:
