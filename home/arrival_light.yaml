@@ -536,8 +536,7 @@ action:
           - platform: state
             entity_id: !input door_entities
             to: 'on'
-            for:
-              minutes: !input arrival_run_time
+            for: !input arrival_run_time
 
         # Turn off light
         - service: light.turn_off
