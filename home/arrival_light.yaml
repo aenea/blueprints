@@ -218,6 +218,14 @@ blueprint:
         duration: {}
       default:
         hours: 8
+    # Amount of time to wait before turning off the arrival light
+    arrival_run_time:
+      name: Arrival run time
+      description: Amount of time to wait before turning off the arrival light
+      selector:
+        duration: {}
+      default:
+        minutes: 45
     # Doors that will turn off the light when opened
     door_entities:
       name: Doors
@@ -291,12 +299,6 @@ trigger:
     entity_id: !input arrival_entity
     to: 'home'
     id: 'arrival'
-
-  # Trigger when doors are opened
-#  - platform: state
-#    entity_id: !input door_entities
-#    to: 'on'
-#    id: 'door_opened'
 
 condition:
   # Guest mode constraint
@@ -534,9 +536,8 @@ action:
           - platform: state
             entity_id: !input door_entities
             to: 'on'
-#          - platform: time
-#            for:
-#              minutes: 45
+            for:
+              minutes: !input arrival_run_time
 
         # Turn off light
         - service: light.turn_off
