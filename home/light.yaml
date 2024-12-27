@@ -240,6 +240,7 @@ blueprint:
         entity:
           device_class: 
             - door
+            - opening
           multiple: true
 
 variables:
