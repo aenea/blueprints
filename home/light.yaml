@@ -529,6 +529,8 @@ action:
       - condition: trigger
         id: 'arrival'
       - "{{ arrival_light == true }}"
+      - "{{ input_boolean.night_mode == 'on' }}"
+      
       sequence:
         - service: light.turn_on
           data:
