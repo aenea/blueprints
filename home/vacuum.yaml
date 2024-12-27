@@ -105,18 +105,6 @@ condition:
         state: 'off'
       - "{{ guest_mode == true }}"
 
-  # run once constraint
-  - condition: and
-    conditions:
-      - condition: template
-        value_template: "{{ run_once == true }}"
-      - condition: template
-        value_template: "{{ not is_state_attr(vacuum_entity, 'status', 'cleaning') or (state_attr(vacuum_entity, 'last_changed') | as_datetime).date() != now().date() }}"
-
-  # Disable before a certain time
-  - condition: template
-    value_template: "{{ now().strftime('%H:%M') >= before_time }}"
-
 action:
   - choose:
     # Someone arrives
@@ -152,6 +140,18 @@ action:
                   value_template: "{{ run_periodically > 0 }}"
                 - condition: template
                   value_template: "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-3)) }}"
+
+        # run once constraint
+        - condition: and
+          conditions:
+            - condition: template
+              value_template: "{{ run_once == true }}"
+            - condition: template
+              value_template: "{{ not is_state_attr(vacuum_entity, 'status', 'cleaning') or (state_attr(vacuum_entity, 'last_changed') | as_datetime).date() != now().date() }}"
+
+        # Disable before a certain time
+        - condition: template
+          value_template: "{{ now().strftime('%H:%M') >= before_time }}"
 
       sequence:
         - if:
