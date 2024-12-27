@@ -73,6 +73,7 @@ variables:
   run_once: !input run_once
   run_periodically: !input run_periodically
   before_time: !input before_time
+  vacuum_entity: !input vacuum_entity
 
 mode: restart
 max_exceeded: silent
