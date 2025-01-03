@@ -326,7 +326,7 @@ condition:
           - condition: state
             entity_id: input_boolean.night_mode
             state: 'off'
-          - "{{ night_only == 'off' }}"
+          - "{{ night_only == false }}"
       - condition: state
         entity_id: input_boolean.night_mode
         state: 'on'        
