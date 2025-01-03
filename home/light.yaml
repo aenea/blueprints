@@ -554,12 +554,22 @@ action:
       - "{{ arrival_light == true }}"
       
       sequence:
-        - service: light.turn_on
-          data:
-            brightness_pct: !input turn_on_brightness
-            transition: !input turn_on_transition
-          target:
-            entity_id: !input light_entity
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ 'switch.' in light_entity[0] }}"
+              sequence:
+                - service: switch.turn_on
+                  data: {}
+                  target:
+                    entity_id: !input light_entity
+          default:
+            - service: light.turn_on
+              data:
+                brightness_pct: !input turn_on_brightness
+                transition: !input turn_on_transition
+              target:
+                entity_id: !input light_entity
 
         # Wait for doors to open or arrival_run_time to elapse
         - wait_for_trigger:
@@ -568,8 +578,46 @@ action:
               to: 'on'
           timeout: !input arrival_run_time
 
-        # Turn off light
-        - service: light.turn_off
-          data: {}
-          target:
-            entity_id: !input light_entity
+        # Turn off light. Different commands for lights/switches
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ 'switch.' in light_entity[0] }}"
+              sequence:
+                - service: switch.turn_off
+                  data: {}
+                  target:
+                    entity_id: !input light_entity
+          default:
+            - if:
+              - condition: and
+                conditions:
+                  - condition: state
+                    entity_id: input_select.home_lighting_mode
+                    state: 'moonlight'
+                  - "{{ moonlight_mode == true }}"
+              then:
+              - if:
+                - condition: template
+                  value_template: "{{ moonlight_color == true }}"
+                then:
+                  - service: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      hs_color:
+                        - "{{ range(360)|random }}"
+                        - "{{ range(80,101)|random }}"
+                      transition: 10
+                    target:
+                      entity_id: !input light_entity
+                else:
+                  - service: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      transition: 10
+                    target:
+                      entity_id: !input light_entity
+              else:
+                - service: light.turn_off
+                  data: {}
+                  entity_id: !input light_entity
