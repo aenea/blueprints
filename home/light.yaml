@@ -86,6 +86,12 @@ blueprint:
       selector:
         boolean: {}
       default: false
+    night_only:
+      name: Trigger only in night mode
+      description: If enabled, the automation will only trigger if night mode is active
+      selector:
+        boolean: {}
+      default: false
     # Amount of time to leave the light on after the triggering sensor turns off
     turn_off_delay:
       name: Delay time
@@ -246,18 +252,19 @@ variables:
   ambient_light_limit: !input ambient_light_limit
   ambient_light_mode: !input ambient_light_mode
   ambient_light_sensor: !input ambient_light_sensor
+  arrival_light: !input arrival_light
+  arrival_entity: !input arrival_entity
+  door_entities: !input door_entities
   guest_mode: !input guest_mode
   home_occupancy: !input home_occupancy
   light_entity: !input light_entity
   moonlight_brightness: !input moonlight_brightness
   moonlight_color: !input moonlight_color
   moonlight_mode: !input moonlight_mode
+  night_only: !input night_only
   nightlight_mode: !input nightlight_mode
   occupancy_mode: !input occupancy_mode
   only_off_mode: !input only_off_mode
-  arrival_light: !input arrival_light
-  arrival_entity: !input arrival_entity
-  door_entities: !input door_entities
 
 mode: restart
 max_exceeded: silent
@@ -312,6 +319,19 @@ condition:
     conditions:
       - "{{ states('input_boolean.guest_mode') == 'off' }}"
       - "{{ guest_mode == 'on' }}"
+
+  # Night only constraint
+  - condition: or
+    conditions:
+      - condition: and
+        conditions:
+          - condition: state
+            entity_id: input_boolean.night_mode
+            state: 'off'
+          - "{{ night_only == 'off' }}"
+      - condition: state
+        entity_id: input_boolean.night_mode
+        state: 'on'        
 
 action:
   - choose:
@@ -528,8 +548,10 @@ action:
     - conditions:
       - condition: trigger
         id: 'arrival'
+      - condition: state
+        entity_id: input_boolean.night_mode
+        state: 'on'
       - "{{ arrival_light == true }}"
-      - "{{ states('input_boolean.night_mode') == 'on' }}"
       
       sequence:
         - service: light.turn_on
