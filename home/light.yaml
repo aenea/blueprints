@@ -529,7 +529,7 @@ action:
       - condition: trigger
         id: 'arrival'
       - "{{ arrival_light == true }}"
-      - "{{ input_boolean.night_mode == 'on' }}"
+      - "{{ states('input_boolean.night_mode') == 'on' }}"
       
       sequence:
         - service: light.turn_on
@@ -539,7 +539,7 @@ action:
           target:
             entity_id: !input light_entity
 
-        # Wait for doors to open or 45 minutes to elapse
+        # Wait for doors to open or arrival_run_time to elapse
         - wait_for_trigger:
             - platform: state
               entity_id: !input door_entities
