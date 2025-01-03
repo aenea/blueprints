@@ -20,8 +20,6 @@
 # - nightlight_brightness: Light brightness during night light mode.
 # - home_mode: Option to turn on the light when someone arrives to an unoccupied house at night.
 # - maximum_run_time: Maximum amount of time before the switch is turned off.
-# - arrival_light: Option to turn on the light when someone arrives at night.
-# - arrival_entity: People that will trigger the arrival light.
 # - arrival_run_time: Amount of time to wait before turning off the arrival light.
 # - door_entities: Doors that will turn off the arrival light when opened.
 
