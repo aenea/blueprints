@@ -146,6 +146,7 @@ action:
           conditions:
             - condition: template
               value_template: "{{ run_once == true }}"
+            
             - condition: template
               value_template: "{{ not is_state_attr(vacuum_entity, 'status', 'cleaning') or (state_attr(vacuum_entity, 'last_changed') | as_datetime).date() != now().date() }}"
 

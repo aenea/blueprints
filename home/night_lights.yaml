@@ -71,20 +71,24 @@ trigger:
     above: !input "stop_elevation"
     # rain has started
   - platform: numeric_state
-    entity_id: sensor.weewx_rainrate_in_per_hour
-    above: '0'
+    entity_id: binary_sensor.davis_vantage_is_raining
+    state:
+      from: 'off'
+      to: 'on'
     # it has reached the temperature to turn off the device
   - platform: numeric_state
-    entity_id: sensor.weewx_outtemp_f
+    entity_id: sensor.davis_vantage_temperature
     below: !input "minimum_temperature"
     # rain has stopped
   - platform: numeric_state
-    entity_id: sensor.weewx_rainrate_in_per_hour
-    below: '0.001'
+    entity_id: binary_sensor.davis_vantage_is_raining
+    state:
+      from: 'on'
+      to: 'off'
     # it is warmer than the minimum temperature
   - platform: numeric_state
-    entity_id: sensor.weewx_outtemp_f
-    value_template: "{{ states('sensor.weewx_outtemp_f') | int - 3 }}" 
+    entity_id: sensor.davis_vantge_temperature
+    value_template: "{{ states('sensor.   davis_vantage_temperature') | int - 3 }}" 
     above: !input "minimum_temperature"
 
 condition:
