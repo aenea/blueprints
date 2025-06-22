@@ -1,9 +1,11 @@
 blueprint:
   name: Night lights
-  description: "Turn a device on near sunset and off near sunrise.\n\
-    Optionally turn off during rain and based on temperature."
+  description: >
+    Turn a device on near sunset and off near sunrise.
+    Optionally turn off during rain and based on temperature.
   domain: automation
-  source_url: https://gist.github.com/networkingcat/a1876d7e706e07c8bdcf974113940fb8
+  source_url: https://github.com/aenea/blueprints/blob/main/home/night_lights.yaml
+
   input:
     target_device:
       name: Target
@@ -14,6 +16,7 @@ blueprint:
             - light
             - switch
           multiple: true
+
     start_elevation:
       name: Turn on elevation
       description: The device turns on when the sun drops to this elevation
@@ -23,7 +26,8 @@ blueprint:
           max: 90
           unit_of_measurement: degrees
           step: 1
-          mode: slider 
+          mode: slider
+
     stop_elevation:
       name: Turn off elevation
       description: The device turns off when the sun climbs to this elevation
@@ -34,12 +38,14 @@ blueprint:
           unit_of_measurement: degrees
           step: 1
           mode: slider
+
     rain_blocker:
       name: Turn off while raining
       description: Turn off the device while it is raining
       default: false
       selector:
         boolean: {}
+
     minimum_temperature:
       name: Minimum temperature (optional)
       description: Turn off the device if the temperature is below this value
@@ -51,45 +57,39 @@ blueprint:
           step: 1
           mode: slider
 
+mode: single
+
 variables:
   rain_blocker: !input rain_blocker
-  target_device: !input "target_device"
-  start_elevation: !input "start_elevation"
-  stop_elevation: !input "stop_elevation"
-  minimum_temperature: !input "minimum_temperature"
+  target_device: !input target_device
+  start_elevation: !input start_elevation
+  stop_elevation: !input stop_elevation
+  minimum_temperature: !input minimum_temperature
 
 trigger:
-    # the sun has dropped to the starting elevation
   - platform: numeric_state
     entity_id: sun.sun
     attribute: elevation
-    below: !input "start_elevation"
-    # the sun has risen to the stopping elevation
+    below: !input start_elevation
+
   - platform: numeric_state
     entity_id: sun.sun
     attribute: elevation
-    above: !input "stop_elevation"
-    # rain has started
-  - platform: numeric_state
+    above: !input stop_elevation
+
+  - platform: state
     entity_id: binary_sensor.davis_vantage_is_raining
-    state:
-      from: 'off'
-      to: 'on'
-    # it has reached the temperature to turn off the device
+    from: 'off'
+    to: 'on'
+
+  - platform: state
+    entity_id: binary_sensor.davis_vantage_is_raining
+    from: 'on'
+    to: 'off'
+
   - platform: numeric_state
     entity_id: sensor.davis_vantage_temperature
-    below: !input "minimum_temperature"
-    # rain has stopped
-  - platform: numeric_state
-    entity_id: binary_sensor.davis_vantage_is_raining
-    state:
-      from: 'on'
-      to: 'off'
-    # it is warmer than the minimum temperature
-  - platform: numeric_state
-    entity_id: sensor.davis_vantge_temperature
-    value_template: "{{ states('sensor.   davis_vantage_temperature') | int - 3 }}" 
-    above: !input "minimum_temperature"
+    below: !input minimum_temperature
 
 condition:
   - condition: state
@@ -98,73 +98,73 @@ condition:
 
 action:
   - choose:
-    - conditions:
-        # too cold
-      - condition: numeric_state
-        entity_id: sensor.weewx_outtemp_f
-        below: !input "minimum_temperature"
-      sequence:
-        - service: homeassistant.turn_off
-          data: {}
-          target:
-            entity_id: !input "target_device"
-    - conditions:
-        # rain starting
-      - condition: numeric_state
-        entity_id: sensor.weewx_rainrate_in_per_hour
-        above: '0'
-      - "{{ rain_blocker == 'on' }}"
-      sequence:
-        - service: homeassistant.turn_off
-          data: {}
-          target:
-            entity_id: !input "target_device"     
-    - conditions:
-        #sun rising
-      - condition: numeric_state
-        entity_id: sun.sun
-        attribute: elevation
-        above: !input "stop_elevation"
-      - condition: state
-        entity_id: sun.sun
-        attribute: rising
-        state: true
-      sequence:
-        - service: homeassistant.turn_off
-          data: {}
-          target:
-            entity_id: !input "target_device"
-    - conditions:
-        # sun setting
-      - condition: numeric_state
-        entity_id: sun.sun
-        attribute: elevation
-        below: !input "start_elevation"
-      - condition: numeric_state
-        entity_id: sensor.weewx_outtemp_f
-        above: !input "minimum_temperature"
-      sequence:
-        - if:
-            - condition: numeric_state
-              entity_id: sensor.weewx_rainrate_in_per_hour
-              above: '0'
-          then:
-            - if:
-                - "{{ rain_blocker == 'off' }}"
-              then:
-                - service: homeassistant.turn_on
-                  data: {}
-                  target:
-                    entity_id: !input "target_device"
-              else:
-                - service: homeassistant.turn_off
-                  data: {}
-                  target:
-                    entity_id: !input "target_device"          
-          else:
-            - service: homeassistant.turn_on
-              data: {}
-              target:
-                entity_id: !input "target_device"         
+      - conditions:
+          - condition: numeric_state
+            entity_id: sensor.davis_vantage_temperature
+            below: !input minimum_temperature
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_device
+
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.davis_vantage_is_raining
+            state: 'on'
+          - condition: template
+            value_template: "{{ rain_blocker }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_device
+
+      - conditions:
+          - condition: numeric_state
+            entity_id: sun.sun
+            attribute: elevation
+            above: !input stop_elevation
+          - condition: template
+            value_template: "{{ state_attr('sun.sun', 'rising') == true }}"
+        sequence:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: !input target_device
+
+      - conditions:
+          - condition: numeric_state
+            entity_id: sun.sun
+            attribute: elevation
+            below: !input start_elevation
+          - condition: numeric_state
+            entity_id: sensor.davis_vantage_temperature
+            above: !input minimum_temperature
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: binary_sensor.davis_vantage_is_raining
+                    state: 'on'
+                  - condition: template
+                    value_template: "{{ not rain_blocker }}"
+                sequence:
+                  - service: homeassistant.turn_on
+                    target:
+                      entity_id: !input target_device
+
+              - conditions:
+                  - condition: state
+                    entity_id: binary_sensor.davis_vantage_is_raining
+                    state: 'on'
+                  - condition: template
+                    value_template: "{{ rain_blocker }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: !input target_device
+
+            default:
+              - service: homeassistant.turn_on
+                target:
+                  entity_id: !input target_device
+
     default: []
-    
