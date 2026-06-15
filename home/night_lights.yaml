@@ -91,11 +91,6 @@ trigger:
     entity_id: sensor.davis_vantage_temperature
     below: !input minimum_temperature
 
-condition:
-  - condition: state
-    entity_id: binary_sensor.vacation_mode
-    state: 'off'
-
 action:
   - choose:
       - conditions:
