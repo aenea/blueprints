@@ -53,6 +53,7 @@ blueprint:
           domain:
             - binary_sensor
             - group
+          multiple: true
     # The light to control
     light_entity:
       name: Light
