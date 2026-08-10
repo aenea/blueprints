@@ -36,6 +36,7 @@ blueprint:
       default: false
       selector:
         boolean: {}
+        multiple: true
     # Option to use the sensor only to turn off the light, not turn it on
     only_off_mode:
       name: Do not turn on the light
