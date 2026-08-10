@@ -37,7 +37,7 @@ blueprint:
       selector:
         entity:
           domain:
-            - boolean: {}
+            - boolean
           multiple: true
     # Option to use the sensor only to turn off the light, not turn it on
     only_off_mode:
