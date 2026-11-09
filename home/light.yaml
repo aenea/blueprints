@@ -371,6 +371,13 @@ triggers:
     to: 'home'
     id: 'arrival'
 
+  # Trigger when Home Assistant has started. A restart drops any run that was
+  # waiting to turn the light off, and the occupancy trigger above can't fire
+  # for a sensor that is already on, so the start branch takes the light back
+  - trigger: homeassistant
+    event: start
+    id: 'ha_start'
+
 conditions:
   # Guest mode constraint
   - condition: or
@@ -720,6 +727,86 @@ actions:
               entity_id: !input door_entities
               to: 'on'
           timeout: !input arrival_run_time
+
+        # Turn off switches; turn off lights, or set them to moonlight in
+        # moonlight mode
+        - if: "{{ switches | count > 0 }}"
+          then:
+            - action: switch.turn_off
+              target:
+                entity_id: "{{ switches }}"
+        - if: "{{ lights | count > 0 }}"
+          then:
+            - if:
+              - condition: and
+                conditions:
+                  - condition: state
+                    entity_id: input_select.home_lighting_mode
+                    state: 'moonlight'
+                  - "{{ moonlight_mode == true }}"
+              then:
+              - if:
+                - "{{ moonlight_color == true }}"
+                then:
+                  - action: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      hs_color:
+                        - "{{ range(360)|random }}"
+                        - "{{ range(80,101)|random }}"
+                      transition: 10
+                    target:
+                      entity_id: "{{ lights }}"
+                else:
+                  - action: light.turn_on
+                    data:
+                      brightness_pct: "{{ moonlight_brightness }}"
+                      transition: 10
+                    target:
+                      entity_id: "{{ lights }}"
+              else:
+                - action: light.turn_off
+                  target:
+                    entity_id: "{{ lights }}"
+
+    # Home Assistant has started
+    - alias: "Home Assistant started: turn the light off once clear"
+      conditions:
+      - condition: trigger
+        id: 'ha_start'
+      - "{{ occupancy_mode == true }}"
+      sequence:
+        # Give slower integrations time to report the light and the sensor
+        - delay:
+            minutes: 1
+        - condition: state
+          entity_id: !input light_entity
+          match: any
+          state: 'on'
+        # A night light is meant to stay on through quiet mode
+        - condition: not
+          conditions:
+            - condition: and
+              conditions:
+                - "{{ nightlight_mode == true }}"
+                - condition: state
+                  entity_id: input_select.home_lighting_mode
+                  state: 'quiet'
+        - if:
+          - condition: state
+            entity_id: !input occupancy_sensor_entity
+            state: 'on'
+          then:
+            - alias: "Wait until the sensor has been off for the delay"
+              wait_for_trigger:
+              - trigger: state
+                entity_id: !input occupancy_sensor_entity
+                to: 'off'
+                for: !input turn_off_delay
+              timeout: !input maximum_run_time
+          else:
+            - alias: "Wait for the delay"
+              delay: !input turn_off_delay
 
         # Turn off switches; turn off lights, or set them to moonlight in
         # moonlight mode
