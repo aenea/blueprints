@@ -4,60 +4,90 @@ blueprint:
     Turn a device on near sunset and off near sunrise.
     Optionally turn off during rain and based on temperature.
   domain: automation
-  source_url: https://github.com/aenea/blueprints/blob/main/home/night_lights.yaml
-
+  author: Scott Anderson
+  source_url: https://raw.githubusercontent.com/aenea/blueprints/main/home/night_lights.yaml
+  homeassistant:
+    min_version: "2024.10.0"
   input:
-    target_device:
-      name: Target
-      description: Device to turn on and off
-      selector:
-        entity:
-          domain:
-            - light
-            - switch
-          multiple: true
+    device_section:
+      name: Device
+      icon: mdi:lightbulb-night
+      input:
+        target_device:
+          name: Target
+          description: Device to turn on and off
+          selector:
+            entity:
+              domain:
+                - light
+                - switch
+              multiple: true
+    sun_section:
+      name: Sun
+      icon: mdi:weather-sunset
+      input:
+        start_elevation:
+          name: Turn on elevation
+          description: The device turns on when the sun drops to this elevation
+          selector:
+            number:
+              min: -90
+              max: 90
+              unit_of_measurement: degrees
+              step: 1
+              mode: slider
+        stop_elevation:
+          name: Turn off elevation
+          description: The device turns off when the sun climbs to this elevation
+          selector:
+            number:
+              min: -90
+              max: 90
+              unit_of_measurement: degrees
+              step: 1
+              mode: slider
+    weather_section:
+      name: Weather
+      icon: mdi:weather-rainy
+      input:
+        rain_sensor:
+          name: Rain sensor
+          description: A binary sensor that is on while it is raining
+          selector:
+            entity:
+              domain:
+                - binary_sensor
+        rain_blocker:
+          name: Turn off while raining
+          description: Turn off the device while it is raining
+          default: false
+          selector:
+            boolean: {}
+        temperature_sensor:
+          name: Outdoor temperature sensor
+          description: The temperature the minimum temperature is checked against
+          selector:
+            entity:
+              domain:
+                - sensor
+              device_class: temperature
+        minimum_temperature:
+          name: Minimum temperature (optional)
+          description: >-
+            Turn off the device while the temperature is below this value. The
+            default, -10, effectively turns this off. If the temperature sensor
+            is unavailable, the device still turns on.
+          default: -10
+          selector:
+            number:
+              min: -10
+              max: 100
+              unit_of_measurement: °F
+              step: 1
+              mode: slider
 
-    start_elevation:
-      name: Turn on elevation
-      description: The device turns on when the sun drops to this elevation
-      selector:
-        number:
-          min: -90
-          max: 90
-          unit_of_measurement: degrees
-          step: 1
-          mode: slider
-
-    stop_elevation:
-      name: Turn off elevation
-      description: The device turns off when the sun climbs to this elevation
-      selector:
-        number:
-          min: -90
-          max: 90
-          unit_of_measurement: degrees
-          step: 1
-          mode: slider
-
-    rain_blocker:
-      name: Turn off while raining
-      description: Turn off the device while it is raining
-      default: false
-      selector:
-        boolean: {}
-
-    minimum_temperature:
-      name: Minimum temperature (optional)
-      description: Turn off the device if the temperature is below this value
-      selector:
-        number:
-          min: -10
-          max: 100
-          unit_of_measurement: °F
-          step: 1
-          mode: slider
-
-mode: single
+mode: restart
+max_exceeded: silent
 
 variables:
   rain_blocker: !input rain_blocker
@@ -66,100 +96,104 @@ variables:
   stop_elevation: !input stop_elevation
   minimum_temperature: !input minimum_temperature
 
-trigger:
-  - platform: numeric_state
+triggers:
+  # The sun has dropped to the turn-on elevation
+  - trigger: numeric_state
     entity_id: sun.sun
     attribute: elevation
     below: !input start_elevation
 
-  - platform: numeric_state
+  # The sun has climbed to the turn-off elevation
+  - trigger: numeric_state
     entity_id: sun.sun
     attribute: elevation
     above: !input stop_elevation
 
-  - platform: state
-    entity_id: binary_sensor.davis_vantage_is_raining
+  # Rain has started
+  - trigger: state
+    entity_id: !input rain_sensor
     from: 'off'
     to: 'on'
 
-  - platform: state
-    entity_id: binary_sensor.davis_vantage_is_raining
+  # Rain has stopped
+  - trigger: state
+    entity_id: !input rain_sensor
     from: 'on'
     to: 'off'
 
-  - platform: numeric_state
-    entity_id: sensor.davis_vantage_temperature
+  # The temperature has dropped below the minimum
+  - trigger: numeric_state
+    entity_id: !input temperature_sensor
     below: !input minimum_temperature
 
-action:
+  # The temperature has risen above the minimum again, so the device can turn
+  # back on after a cold spell
+  - trigger: numeric_state
+    entity_id: !input temperature_sensor
+    above: !input minimum_temperature
+
+  # Home Assistant has started. A restart can miss the sun crossing an
+  # elevation, so check again
+  - trigger: homeassistant
+    event: start
+    id: 'ha_start'
+
+actions:
+  # After a restart, give the sensors a minute to report
+  - if:
+      - condition: trigger
+        id: 'ha_start'
+    then:
+      - delay:
+          minutes: 1
+
   - choose:
-      - conditions:
+      - alias: "Below the minimum temperature: turn off"
+        conditions:
           - condition: numeric_state
-            entity_id: sensor.davis_vantage_temperature
+            entity_id: !input temperature_sensor
             below: !input minimum_temperature
         sequence:
-          - service: homeassistant.turn_off
+          - action: homeassistant.turn_off
             target:
               entity_id: !input target_device
 
-      - conditions:
+      - alias: "Raining: turn off"
+        conditions:
           - condition: state
-            entity_id: binary_sensor.davis_vantage_is_raining
+            entity_id: !input rain_sensor
             state: 'on'
-          - condition: template
-            value_template: "{{ rain_blocker }}"
+          - "{{ rain_blocker }}"
         sequence:
-          - service: homeassistant.turn_off
+          - action: homeassistant.turn_off
             target:
               entity_id: !input target_device
 
-      - conditions:
+      - alias: "Sun up: turn off"
+        conditions:
           - condition: numeric_state
             entity_id: sun.sun
             attribute: elevation
             above: !input stop_elevation
-          - condition: template
-            value_template: "{{ state_attr('sun.sun', 'rising') == true }}"
+          - condition: state
+            entity_id: sun.sun
+            attribute: rising
+            state: true
         sequence:
-          - service: homeassistant.turn_off
+          - action: homeassistant.turn_off
             target:
               entity_id: !input target_device
 
-      - conditions:
+      # The branches above have already turned the device off for cold and,
+      # with the rain blocker, for rain. An unavailable temperature sensor
+      # doesn't keep the device off.
+      - alias: "Sun down: turn on"
+        conditions:
           - condition: numeric_state
             entity_id: sun.sun
             attribute: elevation
             below: !input start_elevation
-          - condition: numeric_state
-            entity_id: sensor.davis_vantage_temperature
-            above: !input minimum_temperature
         sequence:
-          - choose:
-              - conditions:
-                  - condition: state
-                    entity_id: binary_sensor.davis_vantage_is_raining
-                    state: 'on'
-                  - condition: template
-                    value_template: "{{ not rain_blocker }}"
-                sequence:
-                  - service: homeassistant.turn_on
-                    target:
-                      entity_id: !input target_device
-
-              - conditions:
-                  - condition: state
-                    entity_id: binary_sensor.davis_vantage_is_raining
-                    state: 'on'
-                  - condition: template
-                    value_template: "{{ rain_blocker }}"
-                sequence:
-                  - service: homeassistant.turn_off
-                    target:
-                      entity_id: !input target_device
-
-            default:
-              - service: homeassistant.turn_on
-                target:
-                  entity_id: !input target_device
-
-    default: []
+          - action: homeassistant.turn_on
+            target:
+              entity_id: !input target_device
