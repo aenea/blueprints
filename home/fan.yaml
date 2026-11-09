@@ -2,88 +2,109 @@ blueprint:
   name: Fan
   description: Controls a fan based on temperature and, optionally, occupancy.
   domain: automation
+  author: Scott Anderson
+  source_url: https://raw.githubusercontent.com/aenea/blueprints/main/home/fan.yaml
+  homeassistant:
+    min_version: "2024.10.0"
   input:
-    fan_entity:
+    fan_section:
       name: Fan
-      description: The fan to control
-      selector:
-        entity: 
-          domain: 
-            - fan
-    ambient_temperature_sensor:
-      name: Ambient temperature sensor
-      description: The sensor to use for the ambient temperature
-      default:
-      selector:
-        entity:
-          domain:
-            - sensor
-            - group
-          device_class: temperature
-    turn_on_temperature:
-      name: Turn on temperature
-      description: The fan will turn on if the temperature is above this value
-      default: 72      
-      selector:
-        number:
-          min: 50
-          max: 85
-          step: 1
-          unit_of_measurement: °F
-          mode: slider
-    turn_off_temperature:
-      name: Turn off temperature
-      description: The fan will turn off if the temperature is below this value
-      default: 70
-      selector:
-        number:
-          min: 50
-          max: 85
-          step: 1
-          unit_of_measurement: °F
-          mode: slider
-    occupancy_mode:
-      name: Check for occupancy
-      description: If enabled, the automation will check for occupancy before turning on the fan
-      selector:
-        boolean: {}
-      default: false          
-    occupancy_sensor_entity:
-      name: Occupancy sensor
-      description: Sensor that triggers the fan
-      default: {}
-      selector:
-        entity:
-          domain:
-            - binary_sensor
-            - group
-    guest_mode:
-      name: Trigger while in guest mode
-      description: If enabled, the automation can be triggered when guest mode is on
-      selector:
-        boolean: {}
-      default: false
-    home_occupancy:
-      name: Trigger while home is not occupied
-      description: If enabled, the automation can be triggered when the home is not occupied and the fan will not turn off when the home is not occupied
-      selector:
-        boolean: {}
-      default: false
-    quiet_mode:
-      name: Trigger while in quiet mode
-      description: If enabled, the automation can be triggered when quiet mode is on and the fan will not turn off when quiet mode turns on
-      selector:
-        boolean: {}
-      default: false
+      icon: mdi:fan
+      input:
+        fan_entity:
+          name: Fan
+          description: The fan to control
+          selector:
+            entity:
+              domain:
+                - fan
+    temperature_section:
+      name: Temperature
+      icon: mdi:thermometer
+      input:
+        ambient_temperature_sensor:
+          name: Ambient temperature sensor
+          description: The sensor to use for the ambient temperature
+          selector:
+            entity:
+              domain:
+                - sensor
+                - group
+              device_class: temperature
+        turn_on_temperature:
+          name: Turn on temperature
+          description: The fan will turn on if the temperature is above this value
+          default: 72
+          selector:
+            number:
+              min: 50
+              max: 85
+              step: 1
+              unit_of_measurement: °F
+              mode: slider
+        turn_off_temperature:
+          name: Turn off temperature
+          description: The fan will turn off if the temperature is below this value
+          default: 70
+          selector:
+            number:
+              min: 50
+              max: 85
+              step: 1
+              unit_of_measurement: °F
+              mode: slider
+    occupancy_section:
+      name: Occupancy
+      icon: mdi:motion-sensor
+      collapsed: true
+      input:
+        occupancy_mode:
+          name: Check for occupancy
+          description: If enabled, the automation will check for occupancy before turning on the fan
+          selector:
+            boolean: {}
+          default: false
+        occupancy_sensor_entity:
+          name: Occupancy sensor
+          description: Sensor that triggers the fan
+          default: {}
+          selector:
+            entity:
+              domain:
+                - binary_sensor
+                - group
+    modes_section:
+      name: Modes
+      icon: mdi:home-cog
+      collapsed: true
+      input:
+        guest_mode:
+          name: Trigger while in guest mode
+          description: If enabled, the automation can be triggered when guest mode is on
+          selector:
+            boolean: {}
+          default: false
+        home_occupancy:
+          name: Trigger while home is not occupied
+          description: If enabled, the automation can be triggered when the home is not occupied and the fan will not turn off when the home is not occupied
+          selector:
+            boolean: {}
+          default: false
+        quiet_mode:
+          name: Trigger while in quiet mode
+          description: If enabled, the automation can be triggered when quiet mode is on and the fan will not turn off when quiet mode turns on
+          selector:
+            boolean: {}
+          default: false
 
-variables:  
+variables:
   ambient_temperature_sensor: !input ambient_temperature_sensor
-  fan_entity: !input 'fan_entity'
+  fan_entity: !input fan_entity
   guest_mode: !input guest_mode
   home_occupancy: !input home_occupancy
   occupancy_mode: !input occupancy_mode
-  occupancy_sensor_entity: !input occupancy_sensor_entity  
-  quiet_mode: !input quiet_mode  
+  occupancy_sensor_entity: !input occupancy_sensor_entity
+  quiet_mode: !input quiet_mode
 
 mode: restart
 max_exceeded: silent
@@ -92,86 +113,107 @@ trigger_variables:
   occupancy_mode: !input occupancy_mode
   occupancy_sensor_entity: !input occupancy_sensor_entity
 
-trigger:
-  - platform: numeric_state
+triggers:
+  # Trigger when the temperature rises above the turn-on temperature
+  - trigger: numeric_state
     entity_id: !input ambient_temperature_sensor
     above: !input turn_on_temperature
     id: 'temperature_change'
 
-  - platform: numeric_state
+  # Trigger when the temperature falls below the turn-off temperature
+  - trigger: numeric_state
     entity_id: !input ambient_temperature_sensor
     below: !input turn_off_temperature
     id: 'temperature_change'
 
-  - platform: template
+  # Trigger when the room becomes unoccupied
+  - trigger: template
     value_template: "{{ (occupancy_mode == true) and (states(occupancy_sensor_entity) == 'off') }}"
     id: 'occupancy_stops'
 
-  - platform: template
+  # Trigger when the room becomes occupied
+  - trigger: template
     value_template: "{{ (occupancy_mode == true) and (states(occupancy_sensor_entity) == 'on') }}"
     id: 'occupancy_starts'
 
-  - platform: state
+  # Trigger when home occupancy changes
+  - trigger: state
     entity_id: input_boolean.home_occupancy
     id: 'home_occupancy_change'
 
-  - platform: state
+  # Trigger when the lighting mode changes
+  - trigger: state
     entity_id: input_select.home_lighting_mode
     id: 'lighting_mode_change'
 
-condition:
-    # guest mode constraint
+  # Trigger when Home Assistant has started. The temperature can cross a
+  # threshold while Home Assistant is down, so check it again
+  - trigger: homeassistant
+    event: start
+    id: 'ha_start'
+
+conditions:
+  # Guest mode constraint
   - condition: or
     conditions:
       - condition: state
         entity_id: input_boolean.guest_mode
         state: 'off'
-      - "{{ guest_mode == 'on' }}"
+      - "{{ guest_mode == true }}"
 
-action:    
+actions:
   - choose:
       # Home is unoccupied
-      - conditions:
-        - condition: trigger
-          id: 'home_occupancy_change'
-        - condition: state
-          entity_id: input_boolean.home_occupancy
-          state: 'off'
-        - "{{ home_occupancy == false }}"
-
+      - alias: "Home unoccupied: turn the fan off"
+        conditions:
+          - condition: trigger
+            id: 'home_occupancy_change'
+          - condition: state
+            entity_id: input_boolean.home_occupancy
+            state: 'off'
+          - "{{ home_occupancy == false }}"
         sequence:
-          - service: fan.turn_off
+          - action: fan.turn_off
             target:
               entity_id: !input fan_entity
-      
-      # Quiet mode has turned on
-      - conditions:
-        - condition: trigger
-          id: 'lighting_mode_change'
-        - condition: state
-          entity_id: input_select.home_lighting_mode
-          state: 'quiet'
-        - "{{ quiet_mode == false }}"
 
+      # Quiet mode has turned on
+      - alias: "Quiet mode on: turn the fan off"
+        conditions:
+          - condition: trigger
+            id: 'lighting_mode_change'
+          - condition: state
+            entity_id: input_select.home_lighting_mode
+            state: 'quiet'
+          - "{{ quiet_mode == false }}"
         sequence:
-          - service: fan.turn_off
+          - action: fan.turn_off
             data: {}
             target:
               entity_id: !input fan_entity
 
       # Room is no longer occupied
-      - conditions:
-        - condition: trigger
-          id: 'occupancy_stops'
-
+      - alias: "Room unoccupied: turn the fan off"
+        conditions:
+          - condition: trigger
+            id: 'occupancy_stops'
         sequence:
-          - service: fan.turn_off
+          - action: fan.turn_off
             data: {}
             target:
               entity_id: !input fan_entity
 
+    # Anything else, including a Home Assistant start: check the temperature
     default:
-      # home occupancy constraint
+      # After a restart, give the sensors a minute to report
+      - if:
+          - condition: trigger
+            id: 'ha_start'
+        then:
+          - delay:
+              minutes: 1
+
+      # Home occupancy constraint
       - condition: or
         conditions:
           - condition: state
@@ -179,7 +221,7 @@ action:
             state: 'on'
           - "{{ home_occupancy == true }}"
 
-      # quiet mode constraint
+      # Quiet mode constraint
       - condition: or
         conditions:
           - condition: not
@@ -187,47 +229,48 @@ action:
               - condition: state
                 entity_id: input_select.home_lighting_mode
                 state: 'quiet'
-          - "{{ quiet_mode == true }}"    
-          
+          - "{{ quiet_mode == true }}"
+
       - choose:
-        - conditions:          
-          - condition: numeric_state
-            alias: 'Temperature above threshold'
-            entity_id: !input ambient_temperature_sensor
-            above: !input turn_on_temperature
-              
-          - condition: or
+          - alias: "Above the turn-on temperature: turn the fan on"
             conditions:
-              - "{{ occupancy_mode == false }}"
-              - condition: and
+              - condition: numeric_state
+                alias: 'Temperature above threshold'
+                entity_id: !input ambient_temperature_sensor
+                above: !input turn_on_temperature
+              - condition: or
                 conditions:
-                  - "{{ occupancy_mode == true }}"
-                  - "{{ states(occupancy_sensor_entity) == 'on' }}"                
+                  - "{{ occupancy_mode == false }}"
+                  - condition: and
+                    conditions:
+                      - "{{ occupancy_mode == true }}"
+                      - "{{ states(occupancy_sensor_entity) == 'on' }}"
+            sequence:
+              - if:
+                  - condition: state
+                    entity_id: !input fan_entity
+                    state: 'off'
+                then:
+                  - delay:
+                      seconds: 1
+                  - action: fan.turn_on
+                    target:
+                      entity_id: !input fan_entity
+                    data:
+                      percentage: "{{ state_attr(fan_entity, 'percentage_step') | round(0,'floor',1) }}"
 
-          sequence:
-            - if:
-              - condition: state
-                entity_id: !input fan_entity
-                state: 'off'
-              then:
-                - delay:
-                    seconds: 1
-                - service: fan.turn_on
-                  entity_id: !input fan_entity
-                  data:
-                    percentage: "{{ state_attr(fan_entity, 'percentage_step') | round(0,'floor',1) }}"
-
-        - conditions:          
-          - condition: numeric_state
-            alias: 'Temperature below threshold'
-            entity_id: !input ambient_temperature_sensor
-            below: !input turn_off_temperature
-              
-          sequence:
-            - if:
-              - condition: state
-                entity_id: !input fan_entity
-                state: 'on'
-              then:
-                - service: fan.turn_off
-                  entity_id: !input fan_entity
+          - alias: "Below the turn-off temperature: turn the fan off"
+            conditions:
+              - condition: numeric_state
+                alias: 'Temperature below threshold'
+                entity_id: !input ambient_temperature_sensor
+                below: !input turn_off_temperature
+            sequence:
+              - if:
+                  - condition: state
+                    entity_id: !input fan_entity
+                    state: 'on'
+                then:
+                  - action: fan.turn_off
+                    target:
+                      entity_id: !input fan_entity
