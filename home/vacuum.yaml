@@ -1,103 +1,152 @@
 # Summary:
-# This blueprint defines an automation for controlling a vacuum based on occupancy. 
+# This blueprint defines an automation for controlling a vacuum based on occupancy.
 # It includes the following inputs:
 # - vacuum_entity: The vacuum to control.
+# - last_clean_sensor: When the vacuum last started cleaning.
 # - leave_entities: People whose departure will start the vacuum.
-# - arrival_entities: People whose arrival will stop the vacuum.
-# - run_once: Option to run the automation only once per day.
+# - arrival_entities: People whose arrival will send the vacuum back to its dock.
+# - run_once: Option to start the vacuum at most once per day.
 # - before_time: Time before which the vacuum should not run.
-# - run_periodically: Option to run the vacuum periodically if it hasn't been run in a specified number of days.
+# - run_periodically: Run the vacuum if it hasn't cleaned in a specified number of days.
 # - guest_mode: Option to allow the automation to trigger when guest mode is on.
 #
-# The automation triggers when people leave or arrive, and it includes conditions to respect guest mode, 
-# run once per day, and not run before a specified time.
+# The automation triggers when people leave or arrive and when the periodic
+# vacuum check schedule turns on. It respects guest mode, run once per day and
+# the earliest start time.
 
 blueprint:
   name: Vacuum
   description: Controls a vacuum based on occupancy
   domain: automation
+  author: Scott Anderson
+  source_url: https://raw.githubusercontent.com/aenea/blueprints/main/home/vacuum.yaml
+  homeassistant:
+    min_version: "2024.10.0"
   input:
-    vacuum_entity:
+    vacuum_section:
       name: Vacuum
-      description: The vacuum to control
-      selector:
-        entity: 
-          domain: 
-            - vacuum
-    leave_entities:
-      name: Start when people leave
-      description: Start the vacuum when these people leave
-      selector:
-        entity:
-          domain:
-            - person
-          multiple: true
-    arrival_entities:
-      name: Stop when people arrive
-      description: Stop the vacuum when these people arrive
-      selector:
-        entity:
-          domain:
-            - person
-          multiple: true
-    run_once:
-      name: Run once per day
-      description: Don't run the automation more than once per day
-      selector:
-        boolean: {}
-      default: true
-    before_time:
-      name: Do not run before
-      description: Do not run the vacuum before this time
-      selector:
-        time: {}
-      default: '08:00:00'
-    run_periodically:
-      name: Run periodically
-      description: Run the vacuum if it hasn't been run in x days. Set to 0 to disable
-      selector:
-        number:
-          min: 0
-          max: 14
-          step: 1          
-      default: 3
-    guest_mode:
-      name: Trigger while in guest mode
-      description: If enabled, the automation can be triggered when guest mode is on
-      selector:
-        boolean: {}
-      default: false
+      icon: mdi:robot-vacuum
+      input:
+        vacuum_entity:
+          name: Vacuum
+          description: The vacuum to control
+          selector:
+            entity:
+              domain:
+                - vacuum
+        last_clean_sensor:
+          name: Last clean sensor
+          description: >-
+            A timestamp sensor for when the vacuum last started cleaning, such as
+            Roborock's "Last clean begin". Run once per day and Run periodically
+            use it. Without one they use the time the vacuum last docked, which a
+            Home Assistant restart resets.
+          default: ""
+          selector:
+            entity:
+              domain:
+                - sensor
+              device_class: timestamp
+    people_section:
+      name: People
+      icon: mdi:account-multiple
+      input:
+        leave_entities:
+          name: Start when people leave
+          description: Start the vacuum when these people leave
+          selector:
+            entity:
+              domain:
+                - person
+              multiple: true
+        arrival_entities:
+          name: Send home when people arrive
+          description: Send the vacuum back to its dock when these people arrive
+          selector:
+            entity:
+              domain:
+                - person
+              multiple: true
+    schedule_section:
+      name: Schedule
+      icon: mdi:calendar-clock
+      collapsed: true
+      input:
+        run_once:
+          name: Run once per day
+          description: Don't start the vacuum if it has already cleaned today
+          selector:
+            boolean: {}
+          default: true
+        before_time:
+          name: Do not run before
+          description: Do not run the vacuum before this time
+          selector:
+            time: {}
+          default: '08:00:00'
+        run_periodically:
+          name: Run periodically
+          description: >-
+            When the periodic vacuum check schedule turns on, start the vacuum if
+            it hasn't cleaned in this many days. Set to 0 to disable
+          selector:
+            number:
+              min: 0
+              max: 14
+              step: 1
+          default: 3
+    modes_section:
+      name: Modes
+      icon: mdi:home-cog
+      collapsed: true
+      input:
+        guest_mode:
+          name: Trigger while in guest mode
+          description: If enabled, the automation can be triggered when guest mode is on
+          selector:
+            boolean: {}
+          default: false
 
 variables:
   guest_mode: !input guest_mode
   run_once: !input run_once
   run_periodically: !input run_periodically
-  before_time: !input before_time
   vacuum_entity: !input vacuum_entity
+  last_clean_sensor: !input last_clean_sensor
+  # When the vacuum last started cleaning: the last clean sensor, or the time
+  # the vacuum docked if there is no sensor or it has no value
+  last_clean: >-
+    {% set sensor_time = as_datetime(states(last_clean_sensor), none) if last_clean_sensor else none %}
+    {% set docked_time = (expand(vacuum_entity) | first).last_changed if is_state(vacuum_entity, 'docked') else none %}
+    {% set t = sensor_time if sensor_time is not none else docked_time %}
+    {{ t.isoformat() if t is not none else none }}
 
 mode: restart
 max_exceeded: silent
 
-trigger:
-  - platform: state
+triggers:
+  # Trigger when someone arrives
+  - trigger: state
     entity_id: !input arrival_entities
     to: 'home'
     id: 'someone_arrives'
 
-  - platform: state
+  # Trigger when someone leaves
+  - trigger: state
     entity_id: !input leave_entities
     from: 'home'
     to: 'not_home'
     id: 'someone_leaves'
 
-  - platform: state
+  # Trigger when the periodic vacuum check schedule turns on
+  - trigger: state
     entity_id: schedule.periodic_vacuum_check
     from: 'off'
     to: 'on'
     id: 'periodic_schedule'
 
-condition:
-  # guest mode constraint
+conditions:
+  # Guest mode constraint
   - condition: or
     conditions:
       - condition: state
@@ -105,29 +154,28 @@ condition:
         state: 'off'
       - "{{ guest_mode == true }}"
 
-action:
+actions:
   - choose:
     # Someone arrives
-    - conditions:
+    - alias: "Someone arrives: send the vacuum back to its dock"
+      conditions:
         - condition: trigger
           id: 'someone_arrives'
-      
+        # Leave it alone when it is docked, already on its way back, or in error
+        - condition: state
+          entity_id: !input vacuum_entity
+          state:
+            - 'cleaning'
+            - 'paused'
+            - 'idle'
       sequence:
-        - if:
-            - condition: state
-              entity_id: !input vacuum_entity
-              state: cleaning
-          then:
-            - service: vacuum.return_to_base
-              target:
-                entity_id: !input vacuum_entity
-          else:
-            - service: vacuum.stop
-              target:
-                entity_id: !input vacuum_entity
+        - action: vacuum.return_to_base
+          target:
+            entity_id: !input vacuum_entity
 
     # Start the vacuum
-    - conditions:
+    - alias: "Someone leaves, or a clean is due: start the vacuum"
+      conditions:
         - condition: or
           conditions:
             - condition: trigger
@@ -136,30 +184,25 @@ action:
               conditions:
                 - condition: trigger
                   id: 'periodic_schedule'
-                - condition: template
-                  value_template: "{{ run_periodically > 0 }}"
-                - condition: template
-                  value_template: "{{ state_attr(this.entity_id, 'last_triggered') | default(today_at(), true) < (now() + timedelta(days=-3)) }}"
+                - "{{ run_periodically > 0 }}"
+                - "{{ last_clean is none or now() - as_datetime(last_clean) >= timedelta(days=run_periodically) }}"
 
-        # run once constraint
-        - condition: and
+        # Run once per day constraint
+        - condition: or
           conditions:
-            - condition: template
-              value_template: "{{ run_once == true }}"
-            
-            - condition: template
-              value_template: "{{ not is_state_attr(vacuum_entity, 'status', 'cleaning') or (state_attr(vacuum_entity, 'last_changed') | as_datetime).date() != now().date() }}"
+            - "{{ run_once == false }}"
+            - "{{ last_clean is none or as_local(as_datetime(last_clean)).date() != now().date() }}"
 
-        # Disable before a certain time
-        - condition: template
-          value_template: "{{ now().strftime('%H:%M') >= before_time }}"
+        # Do not run before a certain time
+        - condition: time
+          after: !input before_time
 
       sequence:
         - if:
             - condition: state
               entity_id: !input vacuum_entity
-              state: docked
+              state: 'docked'
           then:
-            - service: vacuum.start
-              target: 
+            - action: vacuum.start
+              target:
                 entity_id: !input vacuum_entity
